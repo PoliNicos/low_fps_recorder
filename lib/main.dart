@@ -31,7 +31,10 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   };
 
   @override
-  void initState() { super.initState(); _initCam(_currentRes); }
+  void initState() {
+    super.initState();
+    _initCam(_currentRes);
+  }
 
   Future<void> _initCam(ResolutionPreset res) async {
     _controller = CameraController(widget.cameras[0], res, enableAudio: false);
@@ -43,7 +46,9 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
     final int ySize = img.width * img.height;
     final int uvSize = (img.width / 2).floor() * (img.height / 2).floor();
     final result = Uint8List(ySize + 2 * uvSize);
+    // Piano Y
     result.setRange(0, ySize, img.planes[0].bytes);
+    // Piani U e V
     result.setRange(ySize, ySize + img.planes[1].bytes.length, img.planes[1].bytes);
     result.setRange(ySize + img.planes[1].bytes.length, result.length, img.planes[2].bytes);
     return result;
@@ -52,24 +57,26 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   void _action() async {
     if (_isRecording) {
       await _controller!.stopImageStream();
-      // FIX: Chiudiamo la pipe correttamente per la v6+
-      if (_pipePath != null) FFmpegKitConfig.closePipe(_pipePath); 
+      if (_pipePath != null) {
+        FFmpegKitConfig.closePipe(_pipePath!);
+      }
       setState(() => _isRecording = false);
     } else {
       final dir = await getApplicationDocumentsDirectory();
-      final outPath = "${dir.path}/2fps_${DateTime.now().millisecondsSinceEpoch}.mp4";
+      final outPath = "${dir.path}/out_${DateTime.now().millisecondsSinceEpoch}.mp4";
       
-      // FIX: Sintassi universale per la pipe
+      // Metodo ultra-compatibile per la pipe
       _pipePath = await FFmpegKitConfig.registerNewPipe();
       
       String cmd = "-f rawvideo -pix_fmt yuv420p -s ${_resSizes[_currentRes]} -r 2 -i $_pipePath -c:v libx264 -preset ultrafast -y $outPath";
+      
       FFmpegKit.executeAsync(cmd);
 
       int frameCount = 0;
       await _controller!.startImageStream((image) {
         frameCount++;
+        // Prendi 1 frame ogni 15 (per 30fps base -> 2fps target)
         if (frameCount % 15 == 0 && _pipePath != null) {
-          // FIX: Usiamo writeToPipe (metodo corretto per passare il path e i bytes)
           FFmpegKitConfig.writeToPipe(_pipePath!, _processYUV420(image));
         }
       });
@@ -81,17 +88,24 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   Widget build(BuildContext context) {
     if (_controller == null || !_controller!.value.isInitialized) return const Scaffold();
     return Scaffold(
-      appBar: AppBar(title: const Text("2FPS Smart Cam"), actions: [
+      appBar: AppBar(title: const Text("2FPS Smart Recorder"), actions: [
         DropdownButton<ResolutionPreset>(
           value: _currentRes,
           items: _resSizes.keys.map((r) => DropdownMenuItem(value: r, child: Text(r.name.toUpperCase()))).toList(),
-          onChanged: _isRecording ? null : (r) { setState(() => _currentRes = r!); _initCam(r!); },
+          onChanged: _isRecording ? null : (r) {
+            setState(() => _currentRes = r!);
+            _initCam(r!);
+          },
         )
       ]),
       body: Stack(children: [
         CameraPreview(_controller!),
-        Positioned(bottom: 50, left: 0, right: 0, child: Center(
-          child: FloatingActionButton(onPressed: _action, backgroundColor: _isRecording ? Colors.red : Colors.green, child: Icon(_isRecording ? Icons.stop : Icons.videocam)),
+        Positioned(bottom: 40, left: 0, right: 0, child: Center(
+          child: FloatingActionButton.large(
+            onPressed: _action,
+            backgroundColor: _isRecording ? Colors.red : Colors.blue,
+            child: Icon(_isRecording ? Icons.stop : Icons.videocam),
+          ),
         ))
       ]),
     );

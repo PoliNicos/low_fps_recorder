@@ -52,12 +52,15 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   void _action() async {
     if (_isRecording) {
       await _controller!.stopImageStream();
-      if (_pipePath != null) FFmpegKitConfig.closeCustomNamedPipe(_pipePath!);
+      // FIX: Chiudiamo la pipe correttamente per la v6+
+      if (_pipePath != null) FFmpegKitConfig.closePipe(_pipePath); 
       setState(() => _isRecording = false);
     } else {
       final dir = await getApplicationDocumentsDirectory();
       final outPath = "${dir.path}/2fps_${DateTime.now().millisecondsSinceEpoch}.mp4";
-      _pipePath = await FFmpegKitConfig.registerNewCustomNamedPipe("vidpipe");
+      
+      // FIX: Sintassi universale per la pipe
+      _pipePath = await FFmpegKitConfig.registerNewPipe();
       
       String cmd = "-f rawvideo -pix_fmt yuv420p -s ${_resSizes[_currentRes]} -r 2 -i $_pipePath -c:v libx264 -preset ultrafast -y $outPath";
       FFmpegKit.executeAsync(cmd);
@@ -66,7 +69,8 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
       await _controller!.startImageStream((image) {
         frameCount++;
         if (frameCount % 15 == 0 && _pipePath != null) {
-          FFmpegKitConfig.writeToDefaultPipe(_pipePath!, _processYUV420(image));
+          // FIX: Usiamo writeToPipe (metodo corretto per passare il path e i bytes)
+          FFmpegKitConfig.writeToPipe(_pipePath!, _processYUV420(image));
         }
       });
       setState(() => _isRecording = true);

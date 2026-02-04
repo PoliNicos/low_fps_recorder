@@ -5,7 +5,7 @@ version: 1.0.0+1
 
 # Aggiungi questo blocco QUI:
 environment:
-  sdk: '>=3.10.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:

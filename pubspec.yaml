@@ -11,5 +11,6 @@ dependencies:
   flutter:
     sdk: flutter
   camera: ^0.11.0
-  ffmpeg_kit_flutter_video: ^6.0.3
+  # Usiamo ffmpeg_kit_flutter (pacchetto completo e più stabile)
+  ffmpeg_kit_flutter: ^6.0.3 
   path_provider: ^2.1.1

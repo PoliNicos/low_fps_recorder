@@ -1,8 +1,8 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:ffmpeg_kit_flutter_video/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_video/ffmpeg_kit_config.dart';
 import 'package:path_provider/path_provider.dart';
 
 void main() async {
@@ -22,7 +22,8 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   CameraController? _controller;
   bool _isRecording = false;
   ResolutionPreset _currentRes = ResolutionPreset.medium;
-  String? _pipePath;
+  ServerSocket? _server;
+  Socket? _ffmpegSocket;
 
   final Map<ResolutionPreset, String> _resSizes = {
     ResolutionPreset.low: "320x240",
@@ -31,10 +32,7 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   };
 
   @override
-  void initState() {
-    super.initState();
-    _initCam(_currentRes);
-  }
+  void initState() { super.initState(); _initCam(_currentRes); }
 
   Future<void> _initCam(ResolutionPreset res) async {
     _controller = CameraController(widget.cameras[0], res, enableAudio: false);
@@ -42,42 +40,37 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
     if (mounted) setState(() {});
   }
 
-  Uint8List _processYUV420(CameraImage img) {
-    final int ySize = img.width * img.height;
-    final int uvSize = (img.width / 2).floor() * (img.height / 2).floor();
-    final result = Uint8List(ySize + 2 * uvSize);
-    // Piano Y
-    result.setRange(0, ySize, img.planes[0].bytes);
-    // Piani U e V
-    result.setRange(ySize, ySize + img.planes[1].bytes.length, img.planes[1].bytes);
-    result.setRange(ySize + img.planes[1].bytes.length, result.length, img.planes[2].bytes);
-    return result;
-  }
-
   void _action() async {
     if (_isRecording) {
       await _controller!.stopImageStream();
-      if (_pipePath != null) {
-        FFmpegKitConfig.closePipe(_pipePath!);
-      }
+      _ffmpegSocket?.destroy();
+      await _server?.close();
       setState(() => _isRecording = false);
     } else {
       final dir = await getApplicationDocumentsDirectory();
       final outPath = "${dir.path}/out_${DateTime.now().millisecondsSinceEpoch}.mp4";
       
-      // Metodo ultra-compatibile per la pipe
-      _pipePath = await FFmpegKitConfig.registerNewPipe();
-      
-      String cmd = "-f rawvideo -pix_fmt yuv420p -s ${_resSizes[_currentRes]} -r 2 -i $_pipePath -c:v libx264 -preset ultrafast -y $outPath";
+      // 1. Apriamo un socket locale
+      _server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      int port = _server!.port;
+
+      _server!.listen((client) {
+        _ffmpegSocket = client;
+      });
+
+      // 2. Comando FFmpeg che legge dal socket TCP locale
+      String cmd = "-f rawvideo -pix_fmt yuv420p -s ${_resSizes[_currentRes]} -r 2 -i tcp://127.0.0.1:$port -c:v libx264 -preset ultrafast -y $outPath";
       
       FFmpegKit.executeAsync(cmd);
 
       int frameCount = 0;
       await _controller!.startImageStream((image) {
         frameCount++;
-        // Prendi 1 frame ogni 15 (per 30fps base -> 2fps target)
-        if (frameCount % 15 == 0 && _pipePath != null) {
-          FFmpegKitConfig.writeToPipe(_pipePath!, _processYUV420(image));
+        if (frameCount % 15 == 0 && _ffmpegSocket != null) {
+          // Scriviamo i piani YUV direttamente nel socket
+          for (var plane in image.planes) {
+            _ffmpegSocket!.add(plane.bytes);
+          }
         }
       });
       setState(() => _isRecording = true);
@@ -88,14 +81,11 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
   Widget build(BuildContext context) {
     if (_controller == null || !_controller!.value.isInitialized) return const Scaffold();
     return Scaffold(
-      appBar: AppBar(title: const Text("2FPS Smart Recorder"), actions: [
+      appBar: AppBar(title: const Text("2FPS Socket Cam"), actions: [
         DropdownButton<ResolutionPreset>(
           value: _currentRes,
           items: _resSizes.keys.map((r) => DropdownMenuItem(value: r, child: Text(r.name.toUpperCase()))).toList(),
-          onChanged: _isRecording ? null : (r) {
-            setState(() => _currentRes = r!);
-            _initCam(r!);
-          },
+          onChanged: _isRecording ? null : (r) { setState(() => _currentRes = r!); _initCam(r!); },
         )
       ]),
       body: Stack(children: [
@@ -103,7 +93,7 @@ class _LowFPSStreamerState extends State<LowFPSStreamer> {
         Positioned(bottom: 40, left: 0, right: 0, child: Center(
           child: FloatingActionButton.large(
             onPressed: _action,
-            backgroundColor: _isRecording ? Colors.red : Colors.blue,
+            backgroundColor: _isRecording ? Colors.red : Colors.green,
             child: Icon(_isRecording ? Icons.stop : Icons.videocam),
           ),
         ))

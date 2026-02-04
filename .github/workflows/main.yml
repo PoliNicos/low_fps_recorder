@@ -17,8 +17,10 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0' # Versione stabile più recente nel 2026
-
+          channel: 'stable' # Forza l'uso dell'ultima versione stabile
+          # Rimuovi la riga flutter-version se vuoi sempre l'ultima, 
+          # oppure metti '3.27.0' (una versione comune nel 2026)
+          
       - name: Get dependencies
         run: flutter pub get
 

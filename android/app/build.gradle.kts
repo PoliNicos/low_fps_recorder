@@ -39,6 +39,13 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "**/libc++_shared.so"
+            // Aggiungi queste per sicurezza
+            pickFirst("**/libavcodec.so")
+            pickFirst("**/libavfilter.so")
+            pickFirst("**/libavformat.so")
+            pickFirst("**/libavutil.so")
+            pickFirst("**/libswresample.so")
+            pickFirst("**/libswscale.so")
         }
     }
 }

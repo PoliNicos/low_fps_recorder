@@ -1,0 +1,15 @@
+name: low_fps_recorder
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+# Aggiungi questo blocco QUI:
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  camera: ^0.11.0
+  ffmpeg_kit_flutter_video: ^6.0.3
+  path_provider: ^2.1.1

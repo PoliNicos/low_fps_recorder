@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:ffmpeg_kit_flutter_min_free/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_video/ffmpeg_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
 void main() async {

@@ -2,8 +2,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        // Aggiungiamo il repository specifico di Arthenica come ultima spiaggia
-        maven { url = uri("https://repos.maven.com/maven2") }
     }
 }
 
